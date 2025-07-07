@@ -1,0 +1,10 @@
+{
+  "name": "brainfuck-suite",
+  "version": "1.0.0",
+  "description": "BrainFuck Programming Language Suite",
+  "scripts": {
+    "run": "node bf.run.js"
+  },
+  "author": "Kay Anar",
+  "license": "MIT"
+}
