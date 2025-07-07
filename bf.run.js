@@ -3,43 +3,20 @@
 const fs = require("fs");
 const path = require("path");
 
-function run() {
-    options.run_start = Date.now();
-    if (options.output) {
-        if (options.output === "-") {
-            process.stdout.write(output + "\n");
-        } else {
-            fs.writeFileSync(path.resolve(options.output), output, "utf8");
-        }
-    } else {
-        process.stdout.write(output + "\n");
-    }
-    options.run_end = Date.now();
-    if (options.stats) {
-        const duration = options.run_end - options.run_start;
-        const statsOutput = `Execution time: ${duration} ms`;
-        if (options.output) {
-            if (options.output === "-") {
-                process.stdout.write(statsOutput + "\n");
-            } else {
-                fs.appendFileSync(path.resolve(options.output), statsOutput + "\n", "utf8");
-            }
-        } else {
-            process.stdout.write(statsOutput + "\n");
-        }
-    }
-}
-
 const arguments = process.argv.slice(2);
+
 const options = {
     "cell_size": 8,
     "cell_wrapping": true,
     "debug": false,
-    "dynamic_memory": true,
-    "memory_size": 1,
+    "elastic_tape": true,
     "output": "-",
-    "stats": false
+    "stats": false,
+    "tape_size": 1,
+    "tape_wrapping": false,
 };
+
+const statistics = {};
 
 for (let i = 0; i < arguments.length; i++) {
     switch (arguments[i].toLowerCase()) {
@@ -71,11 +48,14 @@ Options:
   --cell-wrapping, -cw <on|off>
       Enable or disable cell wrapping. Default: on.
 
-  --memory-size, -ms <number>
+  --tape-size, -ts <number>
       Set the memory size (number of cells). Default: 1.
 
-  --dynamic-memory, -dm <on|off>
-      Enable or disable dynamic memory. Default: on.
+  --tape-wrapping, -tw <on|off>
+      Enable or disable tape wrapping. Default: off.
+
+  --elastic-tape, -et <on|off>
+      Enable or disable elastic tape. Default: on.
 
   --debug, -d <on|off>
       Enable or disable debug mode. Default: off.
@@ -103,7 +83,8 @@ Examples:
                 console.error(`Error: ${arguments[i]} and ${arguments.find(argument => ["-c", "--code"].includes(argument.toLowerCase()))} cannot be used at the same time.`);
                 process.exit(1);
             }
-            options.input = arguments[++i];
+            const inputFile = arguments[++i];
+            options.input = inputFile == "-" ? "-" : path.resolve(arguments[++i]);
             break;
         case "--output":
         case "-o":
@@ -136,26 +117,36 @@ Examples:
             options.cell_wrapping = false;
             options.cell_wrapping = cellWrapping === "on" || cellWrapping === "1" || cellWrapping === "true";
             break;
-        case "--memory-size":
-        case "-ms":
-            const memorySize = parseInt(arguments[++i], 10);
-            if (isNaN(memorySize) || memorySize < 1) {
+        case "--tape-size":
+        case "-ts":
+            const tapeSize = parseInt(arguments[++i], 10);
+            if (isNaN(tapeSize) || tapeSize < 1) {
                 console.error(`Error: Parameter for ${arguments[i - 1]} must be a number greater than 1.`);
                 process.exit(1);
             }
-            options.memory_size = memorySize;
+            options.tape_size = tapeSize;
             break;
 
             break;
-        case "--dynamic-memory":
-        case "-dm":
-            const dynamicMemory = `${arguments[++i]}`.toLowerCase();
-            if (!["on", "off"].includes(dynamicMemory)) {
+        case "--tape-wrapping":
+        case "-tw":
+            const tapeWrapping = `${arguments[++i]}`.toLowerCase();
+            if (!["on", "off"].includes(tapeWrapping)) {
+                console.error(`Error: Parameter for ${arguments[i - 1]} must be "on" or "off".`);
+                process.exit(1);
+            }
+            options.tape_wrapping = false;
+            options.tape_wrapping = tapeWrapping === "on" || tapeWrapping === "1" || tapeWrapping === "true";
+            break;
+        case "--elastic-tape":
+        case "-et":
+            const elasticTape = `${arguments[++i]}`.toLowerCase();
+            if (!["on", "off"].includes(elasticTape)) {
                 console.error(`Error: ${arguments[i - 1]} must be "on" or "off".`);
                 process.exit(1);
             }
-            options.dynamic_memory = false;
-            options.dynamic_memory = dynamicMemory === "on" || dynamicMemory === "1" || dynamicMemory === "true";
+            options.elastic_tape = false;
+            options.elastic_tape = elasticTape === "on" || elasticTape === "1" || elasticTape === "true";
             break;
         case "--debug":
         case "-d":
@@ -184,25 +175,60 @@ Examples:
     }
 }
 
+statistics.total_execution_time = Date.now();
+statistics.code_load_time = Date.now();
 if (options.input) {
-    if (options.input === "-") {
-        process.stdin.setEncoding("utf8");
-        options.code = "";
-        process.stdin.on("data", chunk => options.code += chunk);
-        process.stdin.on("end", () => run());
-    } else {
-        try {
-            options.code = fs.readFileSync(path.resolve(options.input), "utf8");
-            run();
-        } catch (exception) {
-            console.error(`Error: Unable to read input file. ${exception.message}`);
-            process.exit(1);
-        }
+    try {
+        options.code = fs.readFileSync(options.input === "-" ? 0 : options.input, "utf8");
+    } catch (exception) {
+        console.error(`Error: Unable to read ${options.input === "-" ? "input from stdio" : "file " + options.input}. ${exception.message}`);
+        process.exit(1);
     }
-} else if (options.code) {
-    run();
 }
-else {
+if (!options.code) {
     console.error("Error: No input file or code provided. Use --help for usage.");
     process.exit(1);
 }
+statistics.code_input_size = options.code.length;
+options.code = options.code.replace(/[^+\-<>\[\],.]/g, "");
+statistics.executable_code_size = options.code.length;
+statistics.code_load_time = Date.now() - statistics.code_load_time;
+
+let pointer = 0;
+const tape = Array(options.tape_size).fill(0);
+
+statistics.total_execution_time = Date.now() - statistics.total_execution_time;
+
+console.log(JSON.stringify({
+    tape : tape,
+    options: options,
+    statistics: statistics,
+}, null, 2));
+
+
+// function run() {
+//     options.run_start = Date.now();
+//     if (options.output) {
+//         if (options.output === "-") {
+//             process.stdout.write(output + "\n");
+//         } else {
+//             fs.writeFileSync(path.resolve(options.output), output, "utf8");
+//         }
+//     } else {
+//         process.stdout.write(output + "\n");
+//     }
+//     options.run_end = Date.now();
+//     if (options.stats) {
+//         const duration = options.run_end - options.run_start;
+//         const statsOutput = `Execution time: ${duration} ms`;
+//         if (options.output) {
+//             if (options.output === "-") {
+//                 process.stdout.write(statsOutput + "\n");
+//             } else {
+//                 fs.appendFileSync(path.resolve(options.output), statsOutput + "\n", "utf8");
+//             }
+//         } else {
+//             process.stdout.write(statsOutput + "\n");
+//         }
+//     }
+// }
