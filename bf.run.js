@@ -9,7 +9,7 @@ const options = {
     "cell_size": 8,
     "cell_wrapping": true,
     "debug": false,
-    "elastic_tape": true,
+    "dynamic_tape": true,
     "output": "-",
     "stats": false,
     "tape_size": 1,
@@ -54,8 +54,8 @@ Options:
   --tape-wrapping, -tw <on|off>
       Enable or disable tape wrapping. Default: off.
 
-  --elastic-tape, -et <on|off>
-      Enable or disable elastic tape. Default: on.
+  --dynamic-tape, -dt <on|off>
+      Enable or disable dynamic tape. Default: on.
 
   --debug, -d <on|off>
       Enable or disable debug mode. Default: off.
@@ -138,15 +138,15 @@ Examples:
             options.tape_wrapping = false;
             options.tape_wrapping = tapeWrapping === "on" || tapeWrapping === "1" || tapeWrapping === "true";
             break;
-        case "--elastic-tape":
+        case "--dynamic-tape":
         case "-et":
-            const elasticTape = `${arguments[++i]}`.toLowerCase();
-            if (!["on", "off"].includes(elasticTape)) {
+            const dynamicTape = `${arguments[++i]}`.toLowerCase();
+            if (!["on", "off"].includes(dynamicTape)) {
                 console.error(`Error: ${arguments[i - 1]} must be "on" or "off".`);
                 process.exit(1);
             }
-            options.elastic_tape = false;
-            options.elastic_tape = elasticTape === "on" || elasticTape === "1" || elasticTape === "true";
+            options.dynamic_tape = false;
+            options.dynamic_tape = dynamicTape === "on" || dynamicTape === "1" || dynamicTape === "true";
             break;
         case "--debug":
         case "-d":
@@ -194,16 +194,85 @@ options.code = options.code.replace(/[^+\-<>\[\],.]/g, "");
 statistics.executable_code_size = options.code.length;
 statistics.code_load_time = Date.now() - statistics.code_load_time;
 
-let pointer = 0;
+let tapePointer = 0;
 const tape = Array(options.tape_size).fill(0);
 
 statistics.total_execution_time = Date.now() - statistics.total_execution_time;
 
 console.log(JSON.stringify({
-    tape : tape,
+    tape: tape,
     options: options,
     statistics: statistics,
 }, null, 2));
+let codePointer = 0;
+
+while (codePointer < options.code.length) {
+    const command = options.code[codePointer];
+    switch (command) {
+        case ">":
+            tapePointer++;
+            if (tapePointer >= tape.length) {
+                if (options.dynamic_tape) {
+                    tape.push(0);
+                } else if (options.tape_wrapping) {
+                    tapePointer = 0;
+                } else {
+                    console.error("Error: Tape pointer out of bounds. Use --tape-wrapping to enable wrapping or --dynamic-tape to allow dynamic tape growth.");
+                    process.exit(1);
+                }
+            }
+            break;
+        case "<":
+            tapePointer--;
+            if (tapePointer < 0) {
+                if (options.tape_wrapping) {
+                    tapePointer = tape.length - 1;
+                } else {
+                    console.error("Error: Tape pointer out of bounds. Use --tape-wrapping to enable wrapping.");
+                    process.exit(1);
+                }
+            }
+            break;
+        case "+":
+            tape[tapePointer] = tape[tapePointer] + 1;
+            if (tape[tapePointer] >= (1 << options.cell_size)) {
+                if (options.cell_wrapping) {
+                    tape[tapePointer] = 0;
+                } else {
+                    console.error(`Error: Cell value exceeds maximum for ${options.cell_size}-bit cells. Use --cell-wrapping to enable wrapping.`);
+                    process.exit(1);
+                }
+            }
+            break;
+        case "-":
+            tape[tapePointer] = tape[tapePointer] - 1;
+            if (tape[tapePointer] < 0) {
+                if (options.cell_wrapping) {
+                    tape[tapePointer] = (1 << options.cell_size) - 1;
+                } else {
+                    console.error(`Error: Cell value cannot be negative for ${options.cell_size}-bit cells. Use --cell-wrapping to enable wrapping.`);
+                    process.exit(1);
+                }
+            }
+            break;
+        case ".":
+            if (options.output === "-") {
+                process.stdout.write(String.fromCharCode(tape[tapePointer]));
+            } else {
+                fs.appendFileSync(path.resolve(options.output), String.fromCharCode(tape[tapePointer]), "utf8");
+            }
+            break;
+        case ",":
+            const inputChar = fs.readSync(0, Buffer.alloc(1), 0, 1);
+            if (inputChar.length > 0) {
+                tape[tapePointer] = inputChar[0];
+            } else {
+                tape[tapePointer] = 0; // EOF, set to 0
+            }
+            break;
+
+    }
+
 
 
 // function run() {
