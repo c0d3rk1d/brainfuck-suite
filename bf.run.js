@@ -3,11 +3,8 @@
 const fs = require("fs");
 const path = require("path");
 
-const VARIANTS = ["Brainfuck", "Blub"];
-
 function run() {
     options.run_start = Date.now();
-    let output = `Running program${options.variant}`;
     if (options.output) {
         if (options.output === "-") {
             process.stdout.write(output + "\n");
@@ -41,8 +38,7 @@ const options = {
     "dynamic_memory": true,
     "memory_size": 1,
     "output": "-",
-    "stats": false,
-    "variant": "brainfuck"
+    "stats": false
 };
 
 for (let i = 0; i < arguments.length; i++) {
@@ -68,9 +64,6 @@ Options:
 
   --code, -c <code>
       Provide code directly as a string.
-
-  --variant, -v <name>
-      Specify the language variant. Default: "Brainfuck".
 
   --cell-size, -cs <bits>
       Set cell size in bits (1-32). Default: 8.
@@ -123,14 +116,6 @@ Examples:
                 process.exit(1);
             }
             options.code = arguments[++i];
-            break;
-        case "--variant":
-        case "-v":
-            options.variant = `${arguments[++i]}`.toLowerCase();
-            if (!VARIANTS.map(variant => variant.toLowerCase()).includes(options.variant)) {
-                console.error(`Error: Unknown parameter ${options.variant} for ${arguments[i - 1]}. Available variants: ${VARIANTS.join(", ")}.`);
-                process.exit(1);
-            }
             break;
         case "--cell-size":
         case "-cs":
