@@ -10,6 +10,7 @@ const options = {
     "cell_wrapping": true,
     "debug": false,
     "dynamic_tape": true,
+    "input": "-",
     "output": "-",
     "stats": false,
     "tape_size": 1,
@@ -27,76 +28,103 @@ Brainfuck Programming Language Suite - Interpreter
 Version 1.0.0 by Kay Anar
 https://github.com/c0d3rk1d/brainfuck-suite
 
-Usage: bf.run.js [options]
+Usage:
+  bf.run.js [options]
 
 Options:
   --help, -h
       Show this help message.
 
-  --input, -i <file>
-      Input file containing code. Use "-" to read from stdin.
-
-  --output, -o <file>
-      Output file. Use "-" for stdout. Default: stdout.
+  --file, -f <file>
+      Specify a file containing Brainfuck code. Use '-' to read from the descriptor specified by '--input'.
 
   --code, -c <code>
-      Provide code directly as a string.
+      Provide Brainfuck code directly as a string.
+
+  --input, -i <descriptor>
+      Specify an input descriptor. Use '-' to read from stdin. Default: 'stdin'.
+
+  --output, -o <descriptor>
+      Specify an output descriptor. Use '-' for output to stdout. Default: 'stdout'.
 
   --cell-size, -cs <bits>
-      Set cell size in bits (1-32). Default: 8.
+      Set the size of each memory cell in bits (1-32). Default: '8'.
 
   --cell-wrapping, -cw <on|off>
-      Enable or disable cell wrapping. Default: on.
+      Enable or disable cell wrapping. Default: 'on'.
 
   --tape-size, -ts <number>
-      Set the memory size (number of cells). Default: 1.
+      Set the memory tape size (number of cells). Default: '1'.
 
   --tape-wrapping, -tw <on|off>
-      Enable or disable tape wrapping. Default: off.
+      Enable or disable tape wrapping. Default: 'off'.
 
   --dynamic-tape, -dt <on|off>
-      Enable or disable dynamic tape. Default: on.
+      Enable or disable dynamic tape resizing. Default: 'on'.
 
   --debug, -d <on|off>
-      Enable or disable debug mode. Default: off.
+      Enable or disable debug mode. Default: 'off'.
 
   --stats, -s <on|off>
-      Enable or disable stats output. Default: off.
+      Enable or disable stats output. Default: 'off'.
 
 Examples:
-  # Run Brainfuck code from a file and output to stdout
-  $ bf.run.js --input program.bf
 
-  # Provide Brainfuck code as a string and save the output
+  # Run Brainfuck code from a file and output to stdout
+  $ bf.run.js --file program.bf
+
+  # Provide Brainfuck code as a string and save the output to a file
   $ bf.run.js --code "++++[>++++<-]>+." --output out.txt
 
   # Use a different cell size and enable debug mode
-  $ bf.run.js -c "++[>++<-]>." --cell-size 16 --debug true
+  $ bf.run.js -c "++[>++<-]>." --cell-size 16 --debug on
 
-  # Read from stdin and write to stdout
-  $ echo "++>++." | bf.run.js -i -
+  # Read from Brainfuck code stdin and output to stdout
+  $ echo "++>++." | bf.run.js -f -
+
+  # Run Brainfuck code with dynamic tape enabled and output stats
+  $ bf.run.js --code "++++[>+++[>+<-]<-]>>." --dynamic-tape on --stats on
+
+  # Run Brainfuck code with no cell wrapping and 16-bit cells
+  $ bf.run.js --code "++++++++[->++++++++<]>." --cell-wrapping off --cell-size 16
+
+  # Run Brainfuck code from a file with custom tape size and no debug mode
+  $ bf.run.js --file program.bf --tape-size 300 --debug off
+
+  # Run code and specify input from a file, output to stdout
+  $ bf.run.js --file input.bf --output -
+
+  # Specify custom tape size and use stdin for input
+  $ echo "++++++++[->++++[->++<]<-]>." | bf.run.js --input - --tape-size 50
+
+  # Debug a Brainfuck program with verbose output and small memory size
+  $ bf.run.js -c "++++[>++++<-]>." --debug on --tape-size 1 --cell-size 8
 `);
             process.exit(0);
-        case "--input":
-        case "-i":
+        case "--file":
+        case "-f":
             if (options.code) {
                 console.error(`Error: ${arguments[i]} and ${arguments.find(argument => ["-c", "--code"].includes(argument.toLowerCase()))} cannot be used at the same time.`);
                 process.exit(1);
             }
-            const inputFile = arguments[++i];
-            options.input = inputFile == "-" ? "-" : path.resolve(arguments[++i]);
+            const file = arguments[++i];
+            options.file = file == "-" ? "-" : path.resolve(file);
+            break;
+        case "--code":
+        case "-c":
+            if (options.file) {
+                console.error(`Error: ${arguments[i]} and ${arguments.find(argument => ["-f", "--file"].includes(argument.toLowerCase()))} cannot be used at the same time.`);
+                process.exit(1);
+            }
+            options.code = arguments[++i];
+            break;
+        case "--input":
+        case "-i":
+            options.input = arguments[++i];
             break;
         case "--output":
         case "-o":
             options.output = arguments[++i];
-            break;
-        case "--code":
-        case "-c":
-            if (options.input) {
-                console.error(`Error: ${arguments[i]} and ${arguments.find(argument => ["-i", "--input"].includes(argument.toLowerCase()))} cannot be used at the same time.`);
-                process.exit(1);
-            }
-            options.code = arguments[++i];
             break;
         case "--cell-size":
         case "-cs":
@@ -177,11 +205,11 @@ Examples:
 
 statistics.total_execution_time = Date.now();
 statistics.code_load_time = Date.now();
-if (options.input) {
+if (options.file) {
     try {
-        options.code = fs.readFileSync(options.input === "-" ? 0 : options.input, "utf8");
+        options.code = fs.readFileSync(options.file === "-" ? (options.input === "-" ? 0 : options.input) : options.file, "utf8");
     } catch (exception) {
-        console.error(`Error: Unable to read ${options.input === "-" ? "input from stdio" : "file " + options.input}. ${exception.message}`);
+        console.error(`Error: Unable to read from ${options.file === "-" ? (options.input === "-" ? "stdin" : options.input) : "file " + options.file}. ${exception.message}`);
         process.exit(1);
     }
 }
