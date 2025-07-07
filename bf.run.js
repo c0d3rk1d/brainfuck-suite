@@ -190,7 +190,7 @@ if (!options.code) {
     process.exit(1);
 }
 statistics.code_input_size = options.code.length;
-options.code = options.code.replace(/[^+\-<>\[\],.]/g, "");
+options.code = options.code.replace(RegExp(`[^+-<>\\[\\],.${options.debug ? "#" : ""}]`, "g"), "");
 statistics.executable_code_size = options.code.length;
 statistics.code_load_time = Date.now() - statistics.code_load_time;
 
@@ -200,7 +200,6 @@ const tape = Array(options.tape_size).fill(0);
 statistics.total_execution_time = Date.now() - statistics.total_execution_time;
 
 console.log(JSON.stringify({
-    tape: tape,
     options: options,
     statistics: statistics,
 }, null, 2));
@@ -263,16 +262,28 @@ while (codePointer < options.code.length) {
             }
             break;
         case ",":
-            const inputChar = fs.readSync(0, Buffer.alloc(1), 0, 1);
-            if (inputChar.length > 0) {
-                tape[tapePointer] = inputChar[0];
-            } else {
-                tape[tapePointer] = 0; // EOF, set to 0
+            const buffer = Buffer.alloc(4);
+            const bytesRead = fs.readSync(0, buffer, 0, 4);
+            let inputChar = 0;
+            if (bytesRead > 0) {
+                const str = buffer.subarray(0, bytesRead).toString("utf8");
+                if (str.length > 0) {
+                    inputChar = str.codePointAt(0);
+                }
+            }
+            tape[tapePointer] = inputChar;
+            if (tape[tapePointer] >= (1 << options.cell_size)) {
+                if (options.cell_wrapping) {
+                    tape[tapePointer] = inputChar % (1 << options.cell_size);
+                } else {
+                    console.error(`Error: Cell value exceeds maximum for ${options.cell_size}-bit cells. Use --cell-wrapping to enable wrapping.`);
+                    process.exit(1);
+                }
             }
             break;
-
     }
-
+    codePointer++;
+}
 
 
 // function run() {
@@ -301,3 +312,5 @@ while (codePointer < options.code.length) {
 //         }
 //     }
 // }
+
+console.log(JSON.stringify(tape, null, 2));
