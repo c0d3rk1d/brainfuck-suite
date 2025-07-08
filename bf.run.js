@@ -5,19 +5,9 @@ const path = require("path");
 
 const arguments = process.argv.slice(2);
 
-const options = {
-    "cell_size": 8,
-    "cell_wrapping": true,
-    "debug": false,
-    "dynamic_tape": true,
-    "input": "-",
-    "output": "-",
-    "stats": false,
-    "tape_size": 1,
-    "tape_wrapping": false,
-};
+let options = {};
 
-const statistics = {};
+let statistics = {};
 
 for (let i = 0; i < arguments.length; i++) {
     switch (arguments[i].toLowerCase()) {
@@ -42,31 +32,31 @@ Options:
       Provide Brainfuck code directly as a string.
 
   --input, -i <descriptor>
-      Specify an input descriptor. Use '-' to read from stdin. Default: 'stdin'.
+      Specify an input descriptor. Use "-" to read from stdin. Default: "stdin".
 
   --output, -o <descriptor>
-      Specify an output descriptor. Use '-' to write to stdout. Default: 'stdout'.
+      Specify an output descriptor. Use "-" to write to stdout. Default: "stdout".
 
   --cell-size, -cs <bits>
-      Set the size of each memory cell in bits (1-32). Default: '8'.
+      Set the size of each memory cell in bits (1-32). Default: "8".
 
   --cell-wrapping, -cw <on|off>
-      Enable or disable cell wrapping. Default: 'on'.
+      Enable or disable cell wrapping. Default: "on".
 
   --tape-size, -ts <number>
-      Set the memory tape size (number of cells). Default: '1'.
+      Set the memory tape size (number of cells). Default: "1".
 
   --tape-wrapping, -tw <on|off>
-      Enable or disable tape wrapping. Default: 'off'.
+      Enable or disable tape wrapping. Default: "off".
 
   --dynamic-tape, -dt <on|off>
-      Enable or disable dynamic tape resizing. Default: 'on'.
+      Enable or disable dynamic tape resizing. Default: "on".
 
   --debug, -d <on|off>
-      Enable or disable debug mode. Default: 'off'.
+      Enable or disable debug mode. Default: "off".
 
   --stats, -s <on|off>
-      Enable or disable stats output. Default: 'off'.
+      Enable or disable stats output. Default: "off".
 
 Examples:
   # Run Brainfuck code from a file
@@ -92,45 +82,59 @@ Examples:
 
 `);
             process.exit(0);
-        case "--file":
-        case "-f":
-            if (options.code) {
-                console.error(`Error: ${arguments[i]} and ${arguments.find(argument => ["-c", "--code"].includes(argument.toLowerCase()))} cannot be used at the same time.`);
+        case "-":
+            if (options.file || options.code) {
+                console.error(`Error: "-" cannot be used when a code ${options.code ? "string" : (options.file === "-" ? "source" : "file")} is already specified.`);
                 process.exit(1);
             }
-            const file = arguments[++i];
-            options.file = file == "-" ? "-" : path.resolve(file);
+            options.file = "-";
             break;
         case "--code":
         case "-c":
-            if (options.file) {
-                console.error(`Error: ${arguments[i]} and ${arguments.find(argument => ["-f", "--file"].includes(argument.toLowerCase()))} cannot be used at the same time.`);
+            if (options.file || options.code) {
+                console.error(`Error: "${arguments[i]}" cannot be used when a code ${options.code ? "string" : (options.file === "-" ? "source" : "file")} is already specified.`);
                 process.exit(1);
             }
             options.code = arguments[++i];
             break;
         case "--input":
         case "-i":
+            if (options.input) {
+                console.error(`Error: "${arguments[i]}" cannot be used when an input descriptor is already specified.`);
+                process.exit(1);
+            }
             options.input = arguments[++i];
             break;
         case "--output":
         case "-o":
+                if (options.output) {
+                console.error(`Error: "${arguments[i]}" cannot be used when an output descriptor is already specified.`);
+                process.exit(1);
+            }
             options.output = arguments[++i];
             break;
         case "--cell-size":
         case "-cs":
+            if (options.cell_size) {
+                console.error(`Error: "${arguments[i]}" cannot be used when a cell size is already specified.`);
+                process.exit(1);
+            }
             const cellSize = parseInt(arguments[++i], 10);
             if (isNaN(cellSize) || cellSize < 1 || cellSize > 32) {
-                console.error(`Error: Parameter for ${arguments[i - 1]} must be a number between 1 and 32.`);
+                console.error(`Error: Parameter for "${arguments[i - 1]}" must be a number between 1 and 32.`);
                 process.exit(1);
             }
             options.cell_size = cellSize;
             break;
         case "--cell-wrapping":
         case "-cw":
+            if (options.cell_wrapping) {
+                console.error(`Error: "${arguments[i]}" cannot be used when cell wrapping is already specified.`);
+                process.exit(1);
+            }
             const cellWrapping = `${arguments[++i]}`.toLowerCase();
             if (!["on", "off"].includes(cellWrapping)) {
-                console.error(`Error: Parameter for ${arguments[i - 1]} must be "on" or "off".`);
+                console.error(`Error: Parameter for "${arguments[i - 1]}" must be "on" or "off".`);
                 process.exit(1);
             }
             options.cell_wrapping = false;
@@ -138,30 +142,40 @@ Examples:
             break;
         case "--tape-size":
         case "-ts":
+            if (options.tape_size) {
+                console.error(`Error: "${arguments[i]}" cannot be used when a tape size is already specified.`);
+                process.exit(1);
+            }
             const tapeSize = parseInt(arguments[++i], 10);
             if (isNaN(tapeSize) || tapeSize < 1) {
-                console.error(`Error: Parameter for ${arguments[i - 1]} must be a number greater than 1.`);
+                console.error(`Error: Parameter for "${arguments[i - 1]}" must be a number greater than 1.`);
                 process.exit(1);
             }
             options.tape_size = tapeSize;
             break;
-
-            break;
         case "--tape-wrapping":
         case "-tw":
+            if (options.tape_wrapping) {
+                console.error(`Error: "${arguments[i]}" cannot be used when tape wrapping is already specified.`);
+                process.exit(1);
+            }
             const tapeWrapping = `${arguments[++i]}`.toLowerCase();
             if (!["on", "off"].includes(tapeWrapping)) {
-                console.error(`Error: Parameter for ${arguments[i - 1]} must be "on" or "off".`);
+                console.error(`Error: Parameter for "${arguments[i - 1]}" must be "on" or "off".`);
                 process.exit(1);
             }
             options.tape_wrapping = false;
             options.tape_wrapping = tapeWrapping === "on" || tapeWrapping === "1" || tapeWrapping === "true";
             break;
         case "--dynamic-tape":
-        case "-et":
+        case "-dt":
+            if (options.dynamic_tape) {
+                console.error(`Error: "${arguments[i]}" cannot be used when dynamic tape is already specified.`);
+                process.exit(1);
+            }
             const dynamicTape = `${arguments[++i]}`.toLowerCase();
             if (!["on", "off"].includes(dynamicTape)) {
-                console.error(`Error: ${arguments[i - 1]} must be "on" or "off".`);
+                console.error(`Error: "${arguments[i - 1]}" must be "on" or "off".`);
                 process.exit(1);
             }
             options.dynamic_tape = false;
@@ -171,7 +185,7 @@ Examples:
         case "-d":
             const debug = `${arguments[++i]}`.toLowerCase();
             if (!["on", "off"].includes(debug)) {
-                console.error(`Error: Parameter for ${arguments[i - 1]} must be "on" or "off".`);
+                console.error(`Error: Parameter for "${arguments[i - 1]}" must be "on" or "off".`);
                 process.exit(1);
             }
             options.debug = false;
@@ -181,18 +195,35 @@ Examples:
         case "-s":
             const stats = `${arguments[++i]}`.toLowerCase();
             if (!["on", "off"].includes(stats)) {
-                console.error(`Error: Parameter for ${arguments[i - 1]} must be "on" or "off".`);
+                console.error(`Error: Parameter for "${arguments[i - 1]}" must be "on" or "off".`);
                 process.exit(1);
             }
             options.stats = false;
             options.stats = stats === "on" || stats === "1" || stats === "true";
             break;
         default:
-            console.warn(`Error: Unknown argument ${arguments[i]}. Use --help for usage.`);
-            process.exit(1);
-
+            if (options.file || options.code || !fs.existsSync(arguments[i])) {
+                console.warn(`Error: Unknown argument "${arguments[i]}". Use --help for usage.`);
+                process.exit(1);
+            }
+            options.file = path.resolve(arguments[i]);
+            break;
     }
 }
+
+options = {
+    ...{
+        "cell_size": 8,
+        "cell_wrapping": true,
+        "debug": false,
+        "dynamic_tape": true,
+        "input": "-",
+        "output": "-",
+        "stats": false,
+        "tape_size": 1,
+        "tape_wrapping": false,
+    }, ...options
+};
 
 statistics.total_execution_time = Date.now();
 statistics.code_load_time = Date.now();
