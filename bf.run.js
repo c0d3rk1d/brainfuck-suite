@@ -7,7 +7,12 @@ const arguments = process.argv.slice(2);
 
 let options = {};
 
-let statistics = {};
+let statistics = {
+    "total_execution_time": performance.now(),
+    "number_of_commands_executed": 0,
+    "command_execution_time": 0,
+    "max_tape_size": 0,
+};
 
 for (let i = 0; i < arguments.length; i++) {
     switch (arguments[i].toLowerCase()) {
@@ -52,11 +57,11 @@ Options:
   --dynamic-tape, -dt <on|off>
       Enable or disable dynamic tape resizing. Default: "on".
 
-  --debug, -d <on|off>
-      Enable or disable debug mode. Default: "off".
+  --debug, -d
+      Enable debug mode. Default: "disabled".
 
-  --stats, -s <on|off>
-      Enable or disable stats output. Default: "off".
+  --stats, -s
+      Enable stats output. Default: "disabled".
 
 Examples:
   # Run Brainfuck code from a file
@@ -137,7 +142,6 @@ Examples:
                 console.error(`Error: Parameter for "${arguments[i - 1]}" must be "on" or "off".`);
                 process.exit(1);
             }
-            options.cell_wrapping = false;
             options.cell_wrapping = cellWrapping === "on" || cellWrapping === "1" || cellWrapping === "true";
             break;
         case "--tape-size":
@@ -152,6 +156,7 @@ Examples:
                 process.exit(1);
             }
             options.tape_size = tapeSize;
+            statistics.max_tape_size = tapeSize;
             break;
         case "--tape-wrapping":
         case "-tw":
@@ -164,7 +169,6 @@ Examples:
                 console.error(`Error: Parameter for "${arguments[i - 1]}" must be "on" or "off".`);
                 process.exit(1);
             }
-            options.tape_wrapping = false;
             options.tape_wrapping = tapeWrapping === "on" || tapeWrapping === "1" || tapeWrapping === "true";
             break;
         case "--dynamic-tape":
@@ -178,28 +182,15 @@ Examples:
                 console.error(`Error: "${arguments[i - 1]}" must be "on" or "off".`);
                 process.exit(1);
             }
-            options.dynamic_tape = false;
             options.dynamic_tape = dynamicTape === "on" || dynamicTape === "1" || dynamicTape === "true";
             break;
         case "--debug":
         case "-d":
-            const debug = `${arguments[++i]}`.toLowerCase();
-            if (!["on", "off"].includes(debug)) {
-                console.error(`Error: Parameter for "${arguments[i - 1]}" must be "on" or "off".`);
-                process.exit(1);
-            }
-            options.debug = false;
-            options.debug = debug === "on" || debug === "1" || debug === "true";
+            options.debug = true
             break;
         case "--stats":
         case "-s":
-            const stats = `${arguments[++i]}`.toLowerCase();
-            if (!["on", "off"].includes(stats)) {
-                console.error(`Error: Parameter for "${arguments[i - 1]}" must be "on" or "off".`);
-                process.exit(1);
-            }
-            options.stats = false;
-            options.stats = stats === "on" || stats === "1" || stats === "true";
+            options.stats = true;
             break;
         default:
             if (options.file || options.code || !fs.existsSync(arguments[i])) {
@@ -225,8 +216,10 @@ options = {
     }, ...options
 };
 
-statistics.total_execution_time = Date.now();
-statistics.code_load_time = Date.now();
+statistics.initial_tape_size = options.tape_size;
+
+statistics.code_load_time = performance.now();
+
 if (options.file) {
     try {
         options.code = fs.readFileSync(options.file === "-" ? (options.input === "-" ? 0 : options.input) : options.file, "utf8");
@@ -240,22 +233,18 @@ if (!options.code) {
     process.exit(1);
 }
 statistics.code_input_size = options.code.length;
-options.code = options.code.replace(RegExp(`[^+-<>\\[\\],.${options.debug ? "#" : ""}]`, "g"), "");
+options.code = options.code.replace(RegExp(`[^+\\-<>\\[\\],.${options.debug ? "#" : ""}]`, "gum"), "");
 statistics.executable_code_size = options.code.length;
-statistics.code_load_time = Date.now() - statistics.code_load_time;
+statistics.code_load_time = performance.now() - statistics.code_load_time;
 
 let tapePointer = 0;
 const tape = Array(options.tape_size).fill(0);
 
-statistics.total_execution_time = Date.now() - statistics.total_execution_time;
-
-console.log(JSON.stringify({
-    options: options,
-    statistics: statistics,
-}, null, 2));
+statistics.command_execution_time = performance.now();
 let codePointer = 0;
 
 while (codePointer < options.code.length) {
+    statistics.number_of_commands_executed++;
     const command = options.code[codePointer];
     switch (command) {
         case ">":
@@ -263,6 +252,9 @@ while (codePointer < options.code.length) {
             if (tapePointer >= tape.length) {
                 if (options.dynamic_tape) {
                     tape.push(0);
+                    if (tape.length > statistics.max_tape_size) {
+                        statistics.max_tape_size = tape.length;
+                    }
                 } else if (options.tape_wrapping) {
                     tapePointer = 0;
                 } else {
@@ -374,7 +366,46 @@ while (codePointer < options.code.length) {
             console.error(`Error: Unknown command "${command}" at position ${codePointer}.`);
             process.exit(1);
     }
+    while (options.dynamic_tape && tape[tape.length - 1] == 0 && tapePointer < tape.length - 1) {
+        tape.pop();
+    }
     codePointer++;
-}
+} statistics.final_tape_size = tape.length;
+statistics.command_execution_time = performance.now() - statistics.command_execution_time;
 
-console.log(JSON.stringify(tape, null, 2));
+statistics.total_execution_time = performance.now() - statistics.total_execution_time;
+if (options.stats) {
+    console.log(`
+Brainfuck Interpreter Statistics:
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+Program Information
+-------------------
+Program Path                : ${options.file}
+Program Size                : ${statistics.code_input_size} character${statistics.code_input_size> 1 ? "s" : ""}
+Executable Code Size        : ${statistics.executable_code_size} character${statistics.executable_code_size> 1 ? "s" : ""}
+Program Load Time           : ${statistics.code_load_time.toFixed(2)} ms
+
+Execution Statistics
+--------------------
+Number of Commands Executed : ${statistics.number_of_commands_executed}
+Command Execution Time      : ${statistics.command_execution_time.toFixed(2)} ms
+Total Execution Time        : ${statistics.total_execution_time.toFixed(2)} ms
+
+Tape Information
+----------------
+Maximum Tape Size           : ${statistics.max_tape_size} cell${statistics.max_tape_size > 1 ? "s" : ""}
+Final Tape Size             : ${statistics.final_tape_size} cell${statistics.final_tape_size > 1 ? "s" : ""}
+Initial Tape Size           : ${statistics.initial_tape_size} cell${statistics.initial_tape_size > 1 ? "s" : ""}
+Dynamic Tape                : ${options.dynamic_tape ? "enabled" : "disabled"}
+Tape Wrapping               : ${options.tape_wrapping ? "enabled" : "disabled"}
+
+Interpreter Configuration
+-------------------------
+Cell Size                   : ${options.cell_size} bit${options.cell_size > 1 ? "s" : ""}
+Cell Wrapping               : ${options.cell_wrapping ? "enabled" : "disabled"}
+Debug Mode                  : ${options.debug ? "enabled" : "disabled"}
+Input Source                : ${options.input === "-" ? "stdin" : options.input}
+Output Destination          : ${options.output === "-" ? "stdout" : options.output}
+`);
+    }
