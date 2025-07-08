@@ -107,7 +107,7 @@ Examples:
             break;
         case "--output":
         case "-o":
-                if (options.output) {
+            if (options.output) {
                 console.error(`Error: "${arguments[i]}" cannot be used when an output descriptor is already specified.`);
                 process.exit(1);
             }
@@ -331,36 +331,50 @@ while (codePointer < options.code.length) {
                 }
             }
             break;
+        case "[":
+            if (tape[tapePointer] === 0) {
+                let openBrackets = 1;
+                while (openBrackets > 0) {
+                    codePointer++;
+                    if (codePointer >= options.code.length) {
+                        console.error("Error: Unmatched '[' in Brainfuck code.");
+                        process.exit(1);
+                    }
+                    if (options.code[codePointer] === "[") {
+                        openBrackets++;
+                    } else if (options.code[codePointer] === "]") {
+                        openBrackets--;
+                    }
+                }
+            }
+            break;
+        case "]":
+            if (tape[tapePointer] !== 0) {
+                let closeBrackets = 1;
+                while (closeBrackets > 0) {
+                    codePointer--;
+                    if (codePointer < 0) {
+                        console.error("Error: Unmatched ']' in Brainfuck code.");
+                        process.exit(1);
+                    }
+                    if (options.code[codePointer] === "]") {
+                        closeBrackets++;
+                    } else if (options.code[codePointer] === "[") {
+                        closeBrackets--;
+                    }
+                }
+            }
+            break;
+        case "#":
+            if (options.debug) {
+                console.log(`Debug: Pointer: ${codePointer}, Tape Pointer: ${tapePointer}, Cell Value: ${tape[tapePointer]}, Tape: [${tape.join(", ")}]`);
+            }
+            break;
+        default:
+            console.error(`Error: Unknown command "${command}" at position ${codePointer}.`);
+            process.exit(1);
     }
     codePointer++;
 }
-
-
-// function run() {
-//     options.run_start = Date.now();
-//     if (options.output) {
-//         if (options.output === "-") {
-//             process.stdout.write(output + "\n");
-//         } else {
-//             fs.writeFileSync(path.resolve(options.output), output, "utf8");
-//         }
-//     } else {
-//         process.stdout.write(output + "\n");
-//     }
-//     options.run_end = Date.now();
-//     if (options.stats) {
-//         const duration = options.run_end - options.run_start;
-//         const statsOutput = `Execution time: ${duration} ms`;
-//         if (options.output) {
-//             if (options.output === "-") {
-//                 process.stdout.write(statsOutput + "\n");
-//             } else {
-//                 fs.appendFileSync(path.resolve(options.output), statsOutput + "\n", "utf8");
-//             }
-//         } else {
-//             process.stdout.write(statsOutput + "\n");
-//         }
-//     }
-// }
 
 console.log(JSON.stringify(tape, null, 2));
