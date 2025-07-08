@@ -29,14 +29,14 @@ Version 1.0.0 by Kay Anar
 https://github.com/c0d3rk1d/brainfuck-suite
 
 Usage:
-  bf.run.js [options]
+  bf.run.js [options] <file | ->
+
+  <file>     Path to a file containing Brainfuck code to execute.
+  -          Read code from the descriptor specified by --input.
 
 Options:
   --help, -h
       Show this help message.
-
-  --file, -f <file>
-      Specify a file containing Brainfuck code. Use '-' to read from the descriptor specified by '--input'.
 
   --code, -c <code>
       Provide Brainfuck code directly as a string.
@@ -45,7 +45,7 @@ Options:
       Specify an input descriptor. Use '-' to read from stdin. Default: 'stdin'.
 
   --output, -o <descriptor>
-      Specify an output descriptor. Use '-' for output to stdout. Default: 'stdout'.
+      Specify an output descriptor. Use '-' to write to stdout. Default: 'stdout'.
 
   --cell-size, -cs <bits>
       Set the size of each memory cell in bits (1-32). Default: '8'.
@@ -69,36 +69,27 @@ Options:
       Enable or disable stats output. Default: 'off'.
 
 Examples:
+  # Run Brainfuck code from a file
+  $ bf.run.js program.bf
 
-  # Run Brainfuck code from a file and output to stdout
-  $ bf.run.js --file program.bf
+  # Read Brainfuck code from stdin
+  $ echo "++>++." | bf.run.js -i - -
 
-  # Provide Brainfuck code as a string and save the output to a file
+  # Provide Brainfuck code directly and output to file
   $ bf.run.js --code "++++[>++++<-]>+." --output out.txt
 
-  # Use a different cell size and enable debug mode
+  # Use a custom cell size and enable debug mode
   $ bf.run.js -c "++[>++<-]>." --cell-size 16 --debug on
 
-  # Read from Brainfuck code stdin and output to stdout
-  $ echo "++>++." | bf.run.js -f -
+  # Run with no cell wrapping and 16-bit cells
+  $ bf.run.js -c "++++++++[->++++++++<]>." --cell-wrapping off --cell-size 16
 
-  # Run Brainfuck code with dynamic tape enabled and output stats
-  $ bf.run.js --code "++++[>+++[>+<-]<-]>>." --dynamic-tape on --stats on
+  # Read from input file and write to stdout
+  $ bf.run.js input.bf --output -
 
-  # Run Brainfuck code with no cell wrapping and 16-bit cells
-  $ bf.run.js --code "++++++++[->++++++++<]>." --cell-wrapping off --cell-size 16
+  # Read from stdin as input and use dynamic tape
+  $ echo ",[.,]" | bf.run.js - --input - --dynamic-tape on
 
-  # Run Brainfuck code from a file with custom tape size and no debug mode
-  $ bf.run.js --file program.bf --tape-size 300 --debug off
-
-  # Run code and specify input from a file, output to stdout
-  $ bf.run.js --file input.bf --output -
-
-  # Specify custom tape size and use stdin for input
-  $ echo "++++++++[->++++[->++<]<-]>." | bf.run.js --input - --tape-size 50
-
-  # Debug a Brainfuck program with verbose output and small memory size
-  $ bf.run.js -c "++++[>++++<-]>." --debug on --tape-size 1 --cell-size 8
 `);
             process.exit(0);
         case "--file":
