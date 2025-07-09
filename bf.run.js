@@ -338,6 +338,9 @@ while (codePointer < options.code.length) {
                     openBrackets--;
                 }
             }
+            if (tape[tapePointer] === 0) {
+                codePointer += codeOffset;
+            }
             break;
         case "]":
             let closeBrackets = 1;
@@ -371,7 +374,9 @@ while (codePointer < options.code.length) {
         tape.pop();
     }
     codePointer++;
-} statistics.final_tape_size = tape.length;
+} 
+
+statistics.final_tape_size = tape.length;
 statistics.command_execution_time = performance.now() - statistics.command_execution_time;
 
 statistics.total_execution_time = performance.now() - statistics.total_execution_time;
