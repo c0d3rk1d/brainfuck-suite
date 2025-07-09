@@ -324,37 +324,38 @@ while (codePointer < options.code.length) {
             }
             break;
         case "[":
-            if (tape[tapePointer] === 0) {
-                let openBrackets = 1;
-                while (openBrackets > 0) {
-                    codePointer++;
-                    if (codePointer >= options.code.length) {
-                        console.error("Error: Unmatched '[' in Brainfuck code.");
-                        process.exit(1);
-                    }
-                    if (options.code[codePointer] === "[") {
-                        openBrackets++;
-                    } else if (options.code[codePointer] === "]") {
-                        openBrackets--;
-                    }
+            let openBrackets = 1;
+            let codeOffset = 0;
+            while (openBrackets > 0) {
+                codeOffset++;
+                if (codePointer + codeOffset >= options.code.length) {
+                    console.error("Error: Unmatched '[' in Brainfuck code.");
+                    process.exit(1);
+                }
+                if (options.code[codePointer + codeOffset] === "[") {
+                    openBrackets++;
+                } else if (options.code[codePointer + codeOffset] === "]") {
+                    openBrackets--;
                 }
             }
             break;
         case "]":
-            if (tape[tapePointer] !== 0) {
-                let closeBrackets = 1;
-                while (closeBrackets > 0) {
-                    codePointer--;
-                    if (codePointer < 0) {
-                        console.error("Error: Unmatched ']' in Brainfuck code.");
-                        process.exit(1);
-                    }
-                    if (options.code[codePointer] === "]") {
-                        closeBrackets++;
-                    } else if (options.code[codePointer] === "[") {
-                        closeBrackets--;
-                    }
+            let closeBrackets = 1;
+            let loopPointer = codePointer;
+            while (closeBrackets > 0) {
+                loopPointer--;
+                if (loopPointer < 0) {
+                    console.error("Error: Unmatched ']' in Brainfuck code.");
+                    process.exit(1);
                 }
+                if (options.code[loopPointer] === "]") {
+                    closeBrackets++;
+                } else if (options.code[loopPointer] === "[") {
+                    closeBrackets--;
+                }
+            }
+            if (tape[tapePointer] !== 0) {
+                codePointer = loopPointer;
             }
             break;
         case "#":
@@ -382,8 +383,8 @@ Brainfuck Interpreter Statistics:
 Program Information
 -------------------
 Program Path                : ${options.file}
-Program Size                : ${statistics.code_input_size} character${statistics.code_input_size> 1 ? "s" : ""}
-Executable Code Size        : ${statistics.executable_code_size} character${statistics.executable_code_size> 1 ? "s" : ""}
+Program Size                : ${statistics.code_input_size} character${statistics.code_input_size > 1 ? "s" : ""}
+Executable Code Size        : ${statistics.executable_code_size} character${statistics.executable_code_size > 1 ? "s" : ""}
 Program Load Time           : ${statistics.code_load_time.toFixed(2)} ms
 
 Execution Statistics
@@ -408,4 +409,4 @@ Debug Mode                  : ${options.debug ? "enabled" : "disabled"}
 Input Source                : ${options.input === "-" ? "stdin" : options.input}
 Output Destination          : ${options.output === "-" ? "stdout" : options.output}
 `);
-    }
+}
