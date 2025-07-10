@@ -55,6 +55,9 @@ Options:
   --dynamic-tape, -dt <on|off>
       Enable or disable dynamic tape resizing. Default: "on".
 
+  --newline, -n
+      Print a newline after output. Default: "disabled".
+
   --debug, -d
       Enable debug mode. Default: "disabled".
 
@@ -165,6 +168,10 @@ Examples:
                     process.exit(1);
                 }
                 options.dynamic_tape = dynamicTape === "on" || dynamicTape === "1" || dynamicTape === "true";
+                break;
+            case "--newline":
+            case "-n":
+                options.newline = true
                 break;
             case "--debug":
             case "-d":
@@ -354,6 +361,9 @@ Examples:
             tape.pop();
         }
         codePointer++;
+    }
+    if(options.newline) {
+        process.stdout.write("\n");
     }
     statistics.final_tape_size = tape.length;
     statistics.command_execution_time = performance.now() - statistics.command_execution_time;
