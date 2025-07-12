@@ -3,102 +3,109 @@
 const fs = require("fs");
 const path = require("path");
 
-
 process.stdin.setEncoding("utf8");
 
+const name = "Brainfuck Programming Language Suite - Interpreter";
+const version = "1.0.0";
+const author = "Kay Anar";
+const repository = "https://github.com/c0d3rk1d/brainfuck-suite";
+
 (async () => {
-    const arguments = process.argv.slice(2);
-
-    let options = {};
-
     let statistics = {
         "total_execution_time": performance.now(),
         "number_of_commands_executed": 0,
         "command_execution_time": 0,
-        "max_tape_size": 0,
+        "max_memory_size": 0,
     };
-
+    let options = {};
+    const arguments = process.argv.slice(2);
     for (let i = 0; i < arguments.length; i++) {
         switch (arguments[i].toLowerCase()) {
+            case "--version":
+            case "-v":
             case "--help":
             case "-h":
+                console.log(`${name}
+Version ${version} by ${author}
+${repository}`);
+                if (arguments[i] === "--version" || arguments[i] === "-v") {
+                    process.exit(0);
+                }
                 console.log(`
-Brainfuck Programming Language Suite - Interpreter
-Version 1.0.0 by Kay Anar
-https://github.com/c0d3rk1d/brainfuck-suite
-
 Usage:
-  bf.run.js [options] <file | ->
+  bf.run [options] <file>
 
-  <file>     Path to a file containing Brainfuck code to execute.
-  -          Read code from the descriptor specified by --input.
+  <file> Path to a file containing Brainfuck code to execute.
 
 Options:
   --help, -h
-      Show this help message.
+      Display this help message and exit.
+
+  --version, -v
+      Display the version of the interpreter and exit.
 
   --code, -c <code>
-      Provide Brainfuck code directly as a string.
+      Execute Brainfuck code code passed as a string.
+      Note: Cannot be used with a file argument.
+      You must choose one or the other.
+      Example: --code "+[----->+++<]>+++.+."
 
-  --cell-size, -cs <bits>
-      Set the size of each memory cell in bits (1-64). Default: "8".
+  --cell-size, -cs <8|16|32|64>
+      Specify the bit size of each memory cell.
+      Memory cells can be 8, 16, 32, or 64 bits unsigned integers.
+      Default: 8
+      Example: --cell-size 16
 
   --cell-wrapping, -cw <on|off>
-      Enable or disable cell wrapping. Default: "on".
+      Enable or disable cell value wrapping.
+      When enabled, values that go below 0 wrap to the maximum cell value,
+      and values above the maximum cell value wrap to 0.
+      Default: on
+      Example: --cell-wrapping off
 
-  --tape-size, -ts <number>
-      Set the memory tape size (number of cells). Default: "1".
+  --memory-size, -ms <number>
+      Set the initial number of memory cells.
+      When dynamic memory (--dynamic-memory) is enabled,
+      memory will not shrink below this size.
+      Default: 1
+      Example: --memory-size 3000
 
-  --tape-wrapping, -tw <on|off>
-      Enable or disable tape wrapping. Default: "off".
+  --memory-wrapping, -mw <on|off>
+      Enable or disable memory pointer wrapping.
+      When enabled, if the pointer moves below cell 0,
+      it wraps to the last cell. If it moves beyond the last cell,
+      it wraps to the first cell.
+      Note: When dynamic memory (--dynamic-memory) is enabled,
+      wrapping above the last cell is disabled.
+      Default: off
+      Example: --memory-wrapping on
 
-  --dynamic-tape, -dt <on|off>
-      Enable or disable dynamic tape resizing. Default: "on".
+  --dynamic-memory, -dm <on|off>
+      Enable or disable dynamic memory resizing.
+      When enabled, the memory can grow beyond the initial size
+      specified by --memory-size but will never shrink below it.
+      Note: When dynamic memory is enabled,
+      pointer wrapping above the last memory cell is disabled,
+      even if --memory-wrapping is on.
+      Default: on
+      Example: --dynamic-memory off
 
   --newline, -n
-      Print a newline after output. Default: "disabled".
-
-  --debug, -d
-      Enable debug mode. Default: "disabled".
+      Print a newline character after execution completes.
 
   --stats, -s
-      Enable stats output. Default: "disabled".
+      Display execution statistics after program completes.
 
-Examples:
-  # Run Brainfuck code from a file
-  $ bf.run.js program.bf
-
-  # Read Brainfuck code from stdin
-  $ echo "++>++." | bf.run.js -i - -
-
-  # Provide Brainfuck code directly and output to file
-  $ bf.run.js --code "++++[>++++<-]>+." --output out.txt
-
-  # Use a custom cell size and enable debug mode
-  $ bf.run.js -c "++[>++<-]>." --cell-size 16 --debug on
-
-  # Run with no cell wrapping and 16-bit cells
-  $ bf.run.js -c "++++++++[->++++++++<]>." --cell-wrapping off --cell-size 16
-
-  # Read from input file and write to stdout
-  $ bf.run.js input.bf --output -
-
-  # Read from stdin as input and use dynamic tape
-  $ echo ",[.,]" | bf.run.js - --input - --dynamic-tape on
-
-`);
+  --debug, -d
+      Enable debug mode. When enabled, you can use the "#" command
+      to print debug information such as the current debug index,
+      total memory size, number of executed commands,
+      and a memory dump centered around the pointer.`);
                 process.exit(0);
-            case "-":
-                if (options.file || options.code) {
-                    console.error(`Error: "-" cannot be used when a code ${options.code ? "string" : (options.file === "-" ? "source" : "file")} is already specified.`);
-                    process.exit(1);
-                }
-                options.file = "-";
-                break;
             case "--code":
             case "-c":
                 if (options.file || options.code) {
-                    console.error(`Error: "${arguments[i]}" cannot be used when a code ${options.code ? "string" : (options.file === "-" ? "source" : "file")} is already specified.`);
+                    console.error(`Error: "${arguments[i]}" cannot be used when a code ${options.code ? "string" : "file"} is already specified.`);
                     process.exit(1);
                 }
                 options.code = arguments[++i];
@@ -110,8 +117,8 @@ Examples:
                     process.exit(1);
                 }
                 const cellSize = parseInt(arguments[++i], 10);
-                if (isNaN(cellSize) || cellSize < 1 || cellSize > 64) {
-                    console.error(`Error: Parameter for "${arguments[i - 1]}" must be a number between 1 and 64.`);
+                if (isNaN(cellSize) || (cellSize != 8 && cellSize != 16 && cellSize != 32 && cellSize != 64)) {
+                    console.error(`Error: Parameter for "${arguments[i - 1]}" must be 8, 16, 32 or 64.`);
                     process.exit(1);
                 }
                 options.cell_size = cellSize;
@@ -129,37 +136,37 @@ Examples:
                 }
                 options.cell_wrapping = cellWrapping === "on" || cellWrapping === "1" || cellWrapping === "true";
                 break;
-            case "--tape-size":
-            case "-ts":
-                if (options.tape_size) {
-                    console.error(`Error: "${arguments[i]}" cannot be used when a tape size is already specified.`);
+            case "--memory-size":
+            case "-ms":
+                if (options.memory_size) {
+                    console.error(`Error: "${arguments[i]}" cannot be used when a memory size is already specified.`);
                     process.exit(1);
                 }
-                const tapeSize = parseInt(arguments[++i], 10);
-                if (isNaN(tapeSize) || tapeSize < 1) {
+                const memorySize = parseInt(arguments[++i], 10);
+                if (isNaN(memorySize) || memorySize < 1) {
                     console.error(`Error: Parameter for "${arguments[i - 1]}" must be a number greater than 1.`);
                     process.exit(1);
                 }
-                options.tape_size = tapeSize;
-                statistics.max_tape_size = tapeSize;
+                options.memory_size = memorySize;
+                statistics.max_memory_size = memorySize;
                 break;
-            case "--tape-wrapping":
-            case "-tw":
-                if (options.tape_wrapping) {
-                    console.error(`Error: "${arguments[i]}" cannot be used when tape wrapping is already specified.`);
+            case "--memory-wrapping":
+            case "-mw":
+                if (options.memory_wrapping) {
+                    console.error(`Error: "${arguments[i]}" cannot be used when memory wrapping is already specified.`);
                     process.exit(1);
                 }
-                const tapeWrapping = `${arguments[++i]}`.toLowerCase();
-                if (!["on", "off"].includes(tapeWrapping)) {
+                const memoryWrapping = `${arguments[++i]}`.toLowerCase();
+                if (!["on", "off"].includes(memoryWrapping)) {
                     console.error(`Error: Parameter for "${arguments[i - 1]}" must be "on" or "off".`);
                     process.exit(1);
                 }
-                options.tape_wrapping = tapeWrapping === "on" || tapeWrapping === "1" || tapeWrapping === "true";
+                options.memory_wrapping = memoryWrapping === "on" || memoryWrapping === "1" || memoryWrapping === "true";
                 break;
-            case "--dynamic-tape":
-            case "-dt":
-                if (options.dynamic_tape) {
-                    console.error(`Error: "${arguments[i]}" cannot be used when dynamic tape is already specified.`);
+            case "--dynamic-memory":
+            case "-dm":
+                if (options.dynamic_memory) {
+                    console.error(`Error: "${arguments[i]}" cannot be used when dynamic memory is already specified.`);
                     process.exit(1);
                 }
                 const dynamicTape = `${arguments[++i]}`.toLowerCase();
@@ -167,7 +174,7 @@ Examples:
                     console.error(`Error: "${arguments[i - 1]}" must be "on" or "off".`);
                     process.exit(1);
                 }
-                options.dynamic_tape = dynamicTape === "on" || dynamicTape === "1" || dynamicTape === "true";
+                options.dynamic_memory = dynamicTape === "on" || dynamicTape === "1" || dynamicTape === "true";
                 break;
             case "--newline":
             case "-n":
@@ -190,23 +197,19 @@ Examples:
                 break;
         }
     }
-
     options = {
         ...{
             "cell_size": 8,
             "cell_wrapping": true,
             "debug": false,
-            "dynamic_tape": true,
+            "dynamic_memory": true,
+            "memory_size": 1,
+            "memory_wrapping": false,
             "stats": false,
-            "tape_size": 1,
-            "tape_wrapping": false,
         }, ...options
     };
-
-    statistics.initial_tape_size = options.tape_size;
-
+    statistics.initial_memory_size = options.memory_size;
     statistics.code_load_time = performance.now();
-
     if (options.file) {
         try {
             options.code = fs.readFileSync(options.file, "utf8");
@@ -223,49 +226,61 @@ Examples:
     options.code = options.code.replace(RegExp(`[^+\\-<>\\[\\],.${options.debug ? "#" : ""}]`, "gum"), "");
     statistics.executable_code_size = options.code.length;
     statistics.code_load_time = performance.now() - statistics.code_load_time;
-
-    let tapePointer = 0;
-    const tape = Array(options.tape_size).fill(0);
-
+    let memoryPointer = 0;
+    let memory;
+    switch (options.cell_size) {
+        case 8:
+            memory = new Uint8Array(options.memory_size);
+            break;
+        case 16:
+            memory = new Uint16Array(options.memory_size);
+            break;
+        case 32:
+            memory = new Uint32Array(options.memory_size);
+            break;
+        case 64:
+            memory = new BigUint64Array(options.memory_size);
+            break;
+    }
+    const max_cell_value = Math.pow(2, options.cell_size);
     statistics.command_execution_time = performance.now();
     let codePointer = 0;
-
     while (codePointer < options.code.length) {
         statistics.number_of_commands_executed++;
         const command = options.code[codePointer];
         switch (command) {
             case ">":
-                tapePointer++;
-                if (tapePointer >= tape.length) {
-                    if (options.dynamic_tape) {
-                        tape.push(0);
-                        if (tape.length > statistics.max_tape_size) {
-                            statistics.max_tape_size = tape.length;
+                memoryPointer++;
+                if (memoryPointer >= memory.length) {
+                    if (options.dynamic_memory) {
+                        memory = [...memory, 0];
+                        if (memory.length > statistics.max_memory_size) {
+                            statistics.max_memory_size = memory.length;
                         }
-                    } else if (options.tape_wrapping) {
-                        tapePointer = 0;
+                    } else if (options.memory_wrapping) {
+                        memoryPointer = 0;
                     } else {
-                        console.error("Error: Tape pointer out of bounds. Use --tape-wrapping to enable wrapping or --dynamic-tape to allow dynamic tape growth.");
+                        console.error("Error: Tape pointer out of bounds. Use --memory-wrapping to enable wrapping or --dynamic-memory to allow dynamic memory growth.");
                         process.exit(1);
                     }
                 }
                 break;
             case "<":
-                tapePointer--;
-                if (tapePointer < 0) {
-                    if (options.tape_wrapping) {
-                        tapePointer = tape.length - 1;
+                memoryPointer--;
+                if (memoryPointer < 0) {
+                    if (options.memory_wrapping) {
+                        memoryPointer = memory.length - 1;
                     } else {
-                        console.error("Error: Tape pointer out of bounds. Use --tape-wrapping to enable wrapping.");
+                        console.error("Error: Tape pointer out of bounds. Use --memory-wrapping to enable wrapping.");
                         process.exit(1);
                     }
                 }
                 break;
             case "+":
-                tape[tapePointer] = tape[tapePointer] + 1;
-                if (tape[tapePointer] >= Math.pow(2, options.cell_size)) {
+                memory[memoryPointer] = memory[memoryPointer] + 1;
+                if (memory[memoryPointer] > max_cell_value) {
                     if (options.cell_wrapping) {
-                        tape[tapePointer] = 0;
+                        memory[memoryPointer] = 0;
                     } else {
                         console.error(`Error: Cell value exceeds maximum for ${options.cell_size}-bit cells. Use --cell-wrapping to enable wrapping.`);
                         process.exit(1);
@@ -273,10 +288,10 @@ Examples:
                 }
                 break;
             case "-":
-                tape[tapePointer] = tape[tapePointer] - 1;
-                if (tape[tapePointer] < 0) {
+                memory[memoryPointer] = memory[memoryPointer] - 1;
+                if (memory[memoryPointer] < 0) {
                     if (options.cell_wrapping) {
-                        tape[tapePointer] = Math.pow(2, options.cell_size) - 1;
+                        memory[memoryPointer] = max_cell_value - 1;
                     } else {
                         console.error(`Error: Cell value cannot be negative for ${options.cell_size}-bit cells. Use --cell-wrapping to enable wrapping.`);
                         process.exit(1);
@@ -284,7 +299,7 @@ Examples:
                 }
                 break;
             case ".":
-                process.stdout.write(String.fromCharCode(tape[tapePointer]));
+                process.stdout.write(String.fromCharCode(memory[memoryPointer]));
                 break;
             case ",":
                 const inputChar = await (new Promise((resolve) => {
@@ -298,12 +313,11 @@ Examples:
                     codePointer = options.code.length;
                     break;
                 }
-                tape[tapePointer] = inputChar;
+                memory[memoryPointer] = inputChar;
                 process.stdout.write(String.fromCharCode(inputChar));
-//                console.log(JSON.stringify(tape, null, 2));
-                if (tape[tapePointer] >= Math.pow(2, options.cell_size)) {
+                if (memory[memoryPointer] >= Math.pow(2, options.cell_size)) {
                     if (options.cell_wrapping) {
-                        tape[tapePointer] = inputChar % Math.pow(2, options.cell_size);
+                        memory[memoryPointer] = inputChar % Math.pow(2, options.cell_size);
                     } else {
                         console.error(`Error: Cell value exceeds maximum for ${options.cell_size}-bit cells. Use --cell-wrapping to enable wrapping.`);
                         process.exit(1);
@@ -325,7 +339,7 @@ Examples:
                         openBrackets--;
                     }
                 }
-                if (tape[tapePointer] === 0) {
+                if (memory[memoryPointer] === 0) {
                     codePointer += codeOffset;
                 }
                 break;
@@ -344,30 +358,29 @@ Examples:
                         closeBrackets--;
                     }
                 }
-                if (tape[tapePointer] !== 0) {
+                if (memory[memoryPointer] !== 0) {
                     codePointer = loopPointer;
                 }
                 break;
             case "#":
                 if (options.debug) {
-                    console.log(`Debug: Pointer: ${codePointer}, Tape Pointer: ${tapePointer}, Cell Value: ${tape[tapePointer]}, Tape: [${tape.join(", ")}]`);
+                    console.log(`Debug: Pointer: ${codePointer}, Tape Pointer: ${memoryPointer}, Cell Value: ${memory[memoryPointer]}, Tape: [${memory.join(", ")}]`);
                 }
                 break;
             default:
                 console.error(`Error: Unknown command "${command}" at position ${codePointer}.`);
                 process.exit(1);
         }
-        while (options.dynamic_tape && tape[tape.length - 1] == 0 && tapePointer < tape.length - 1) {
-            tape.pop();
+        while (options.dynamic_memory && memory[memory.length - 1] == 0 && memoryPointer < memory.length - 1) {
+            memory.pop();
         }
         codePointer++;
     }
-    if(options.newline) {
+    if (options.newline) {
         process.stdout.write("\n");
     }
-    statistics.final_tape_size = tape.length;
+    statistics.final_memory_size = memory.length;
     statistics.command_execution_time = performance.now() - statistics.command_execution_time;
-
     statistics.total_execution_time = performance.now() - statistics.total_execution_time;
     if (options.stats) {
         console.log(`
@@ -389,14 +402,14 @@ Total Execution Time   : ${statistics.total_execution_time.toFixed(2)} ms
 
 Tape Information
 ----------------
-Initial Tape Size      : ${statistics.initial_tape_size} cell${statistics.initial_tape_size > 1 ? "s" : ""}
-Final Tape Size        : ${statistics.final_tape_size} cell${statistics.final_tape_size > 1 ? "s" : ""}
-Maximum Tape Size      : ${statistics.max_tape_size} cell${statistics.max_tape_size > 1 ? "s" : ""}
+Initial Tape Size      : ${statistics.initial_memory_size} cell${statistics.initial_memory_size > 1 ? "s" : ""}
+Final Tape Size        : ${statistics.final_memory_size} cell${statistics.final_memory_size > 1 ? "s" : ""}
+Maximum Tape Size      : ${statistics.max_memory_size} cell${statistics.max_memory_size > 1 ? "s" : ""}
 
 Tape Configuration
 ------------------
-Dynamic Tape           : ${options.dynamic_tape ? "enabled" : "disabled"}
-Tape Wrapping          : ${options.tape_wrapping ? "enabled" : "disabled"}
+Dynamic Tape           : ${options.dynamic_memory ? "enabled" : "disabled"}
+Tape Wrapping          : ${options.memory_wrapping ? "enabled" : "disabled"}
 
 Cell Configuration
 ------------------
