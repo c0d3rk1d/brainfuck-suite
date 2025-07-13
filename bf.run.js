@@ -100,7 +100,8 @@ Options:
       Enable debug mode. When enabled, you can use the "#" command
       to print debug information such as the current debug index,
       total memory size, number of executed commands,
-      and a memory dump centered around the pointer.`);
+      and a memory dump centered around the pointer.
+`);
                 process.exit(0);
             case "--code":
             case "-c":
@@ -227,21 +228,8 @@ Options:
     statistics.executable_code_size = options.code.length;
     statistics.code_load_time = performance.now() - statistics.code_load_time;
     let memoryPointer = 0;
-    let memory;
-    switch (options.cell_size) {
-        case 8:
-            memory = new Uint8Array(options.memory_size);
-            break;
-        case 16:
-            memory = new Uint16Array(options.memory_size);
-            break;
-        case 32:
-            memory = new Uint32Array(options.memory_size);
-            break;
-        case 64:
-            memory = new BigUint64Array(options.memory_size);
-            break;
-    }
+    let memory = new Array(options.memory_size).fill(0);
+    console.log(JSON.stringify(memory, null, 2));
     const max_cell_value = Math.pow(2, options.cell_size);
     statistics.command_execution_time = performance.now();
     let codePointer = 0;
@@ -274,6 +262,8 @@ Options:
                         console.error("Error: Tape pointer out of bounds. Use --memory-wrapping to enable wrapping.");
                         process.exit(1);
                     }
+                } else if (options.dynamic_memory && memory.length > options.memory_size && memoryPointer == memory.length - 2 && memory[memory.length - 1] == 0) {
+                    memory = memory.slice(0, memory.length - 1);
                 }
                 break;
             case "+":
@@ -371,14 +361,15 @@ Options:
                 console.error(`Error: Unknown command "${command}" at position ${codePointer}.`);
                 process.exit(1);
         }
-        while (options.dynamic_memory && memory[memory.length - 1] == 0 && memoryPointer < memory.length - 1) {
-            memory.pop();
-        }
+        // while (options.dynamic_memory && memory[memory.length - 1] == 0 && memoryPointer < memory.length - 1) {
+        //     memory = memory.slice(0, memory.length - 1);
+        // }
         codePointer++;
     }
     if (options.newline) {
         process.stdout.write("\n");
     }
+    console.log(JSON.stringify(memory));
     statistics.final_memory_size = memory.length;
     statistics.command_execution_time = performance.now() - statistics.command_execution_time;
     statistics.total_execution_time = performance.now() - statistics.total_execution_time;
@@ -389,7 +380,7 @@ Brainfuck Interpreter Statistics:
 
 Program Information
 -------------------
-Program Path           : ${options.file}
+Program Path           : ${options.file || ""}
 Program Size           : ${statistics.code_input_size} character${statistics.code_input_size > 1 ? "s" : ""}
 Executable Code Size   : ${statistics.executable_code_size} character${statistics.executable_code_size > 1 ? "s" : ""}
 Program Load Time      : ${statistics.code_load_time.toFixed(2)} ms
